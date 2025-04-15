@@ -1,12 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List
 import tempfile
 import os
 import librosa
+import torch
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from Extraction.emotion_recognizer import EmotionRecognizer  
+from emotion_detection import model, processor  # Directly import model and processor
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -15,20 +16,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Allow CORS (Cross-Origin Resource Sharing)
+# Add CORS middleware to allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["http://localhost:3000"],  # Allow the frontend origin
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
-# Load EmotionRecognizer once when the server starts
-recognizer = EmotionRecognizer(model_path="E:/Documents/Sem_6/PROJECT/Speech Emotion Recognisation/Backend/emotion_model.pth")
-
 # =================== Response Models ===================
-
 class EmotionResponse(BaseModel):
     emotions: Dict[str, float]
     predominant_emotion: str
@@ -37,12 +34,7 @@ class EmotionResponse(BaseModel):
 class FormatResponse(BaseModel):
     supported_formats: List[str]
 
-class ModelInfoResponse(BaseModel):
-    emotions: List[str]
-    is_trained: bool
-
 # =================== Routes ===================
-
 @app.get("/")
 async def root():
     return {
@@ -52,7 +44,6 @@ async def root():
         "endpoints": [
             {"path": "/", "method": "GET", "description": "API info"},
             {"path": "/formats", "method": "GET", "description": "Supported audio formats"},
-            {"path": "/model-info", "method": "GET", "description": "Info about the emotion model"},
             {"path": "/analyze-audio", "method": "POST", "description": "Analyze an uploaded audio file"},
         ]
     }
@@ -61,24 +52,12 @@ async def root():
 async def formats():
     return {"supported_formats": ["wav", "mp3", "flac", "ogg", "m4a"]}
 
-@app.get("/model-info", response_model=ModelInfoResponse)
-async def model_info():
-    return {
-        "emotions": recognizer.labels,
-        "is_trained": True
-    }
-
 @app.post("/analyze-audio", response_model=EmotionResponse)
 async def analyze_audio(audio_file: UploadFile = File(...)):
-    # Validate file format
     file_extension = os.path.splitext(audio_file.filename)[1][1:].lower()
     if file_extension not in ["wav", "mp3", "flac", "ogg", "m4a"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format: {file_extension}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported file format: {file_extension}")
 
-    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as temp_file:
         content = await audio_file.read()
         temp_file.write(content)
@@ -88,16 +67,28 @@ async def analyze_audio(audio_file: UploadFile = File(...)):
         # Load audio using librosa
         waveform, sr = librosa.load(temp_file_path, sr=16000)
 
-        # Predict emotion
-        predictions = recognizer.predict(waveform, sr)
+        # Preprocess the audio with the processor
+        input_values = processor(waveform, return_tensors="pt", sampling_rate=16000).input_values
 
-        # Get top emotion
-        top_emotion = max(predictions.items(), key=lambda x: x[1])
-        return {
-            "emotions": predictions,
-            "predominant_emotion": top_emotion[0],
-            "confidence": round(top_emotion[1], 4)
-        }
+        # Make the emotion prediction
+        with torch.no_grad():
+            logits = model(input_values).logits
+
+        # Get predicted emotion class (Assuming you have a predefined list of emotions)
+        predicted_class = torch.argmax(logits, dim=-1).item()
+
+        # Define emotions (this should match the classes of your model)
+        emotions = ["happy", "sad", "angry", "neutral"]  # Example emotions, replace with your actual classes
+
+        # Get the emotion name
+        predicted_emotion = emotions[predicted_class]
+        confidence = round(logits[0][predicted_class].item(), 4)
+
+        return EmotionResponse(
+            emotions={predicted_emotion: confidence},
+            predominant_emotion=predicted_emotion,
+            confidence=confidence
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
