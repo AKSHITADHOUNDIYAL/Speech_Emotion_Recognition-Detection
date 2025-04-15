@@ -43,13 +43,18 @@ The application consists of a **FastAPI backend** and a **React.js frontend**, d
 ---
 
 ## 📁 Project Structure
-Speech-Emotion-Recognition/
+`Speech-Emotion-Recognition/
 ├── Backend/
-│   ├── main.py                # FastAPI app entry point
-│   ├── emotion_detection.py   # Loads model, handles preprocessing & prediction
-│   ├── emotion_model.pth      # Fine-tuned Wav2Vec2 model
-│   └── emotion_recognizer.py  # Audio feature extractor & real-time recognition class
-    └── audio_processor.py
+│   ├── main.py                
+│   ├── emotion_detection.py   
+│   ├── emotion_model.pth      
+│   └── Extraction
+|        └── emotion_recognizer.py 
+|   └── audio_processor.py
+|    └── Prediction 
+|       └── model
+|            └── emotion_detection.plt 
+|        
 │
 ├── Frontend/
 │   ├── src/
@@ -60,11 +65,11 @@ Speech-Emotion-Recognition/
 │   │   │   ├── EmotionBarChart.jsx     
 │   │   │   └── WaveformPlot.jsx      
 │   │   └── index.js
-        ├── App.jsx         # React app entry point
+        ├── App.jsx        
 │   ├── public/
-│   └── package.json               # Frontend dependencies & scripts
+│   └── package.json              
 │
-└── README.md
+└── README.md`
 
 ## ⚙️ Features
 
@@ -91,12 +96,19 @@ Speech-Emotion-Recognition/
    git clone https://github.com/your-username/Speech-Emotion-Recognition.git
    cd Speech-Emotion-Recognition
 
-## Backend setup (inside Backend/)
-cd Backend
-pip install -r requirements.txt
-uvicorn main:app --reload
+2. **  Frontend setup (inside Frontend/) **
+   ``` bash
+    cd Frontend
+    npm install
+    npm start
 
-## Frontend setup (inside Frontend/)
-cd Frontend
-npm install
-npm start
+3. **Backend setup (inside Backend/)**
+    ```bash
+      cd Backend
+      pip install -r requirements.txt
+      uvicorn main:app --reload
+
+## Google Drive Folder
+
+You can access the necessary files from our [Google Drive Folder](https://drive.google.com/drive/folders/1qPnUan8NRQEQxBT2IbY5NXk-7sxnIUbG?usp=drive_link).
+This contains emotion_detection.plt
